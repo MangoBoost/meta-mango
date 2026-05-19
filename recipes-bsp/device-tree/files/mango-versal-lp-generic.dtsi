@@ -1,0 +1,4 @@
+/include/ "fragments/versal-common.dtsi"
+/include/ "fragments/mango-drivers-common.dtsi"
+/include/ "fragments/mango-drivers-bnic.dtsi"
+/include/ "fragments/mango-drivers-mgmt.dtsi"

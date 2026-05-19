@@ -1,0 +1,3 @@
+&mb_mgmt0 {
+	status = "okay";
+};

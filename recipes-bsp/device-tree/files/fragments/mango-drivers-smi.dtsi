@@ -1,0 +1,160 @@
+/include/ "fragments/rpu-resources.dtsi"
+
+/ {
+	mb_smi0: mb-smi.0 {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		compatible = "mangoboost,smi";
+		status = "okay";
+
+		remoteproc = <&r5f_0>;
+		memory-region = <&rpu_reserved2>;
+	};
+};
+
+&{/} {
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		/* RPU0 - 2MB */
+		rproc_0_reserved: rproc@60400000 {
+			no-map;
+			reg = <0x0 0x60400000 0x0 0x40000>; // 256KB, rsc table
+		};
+		rpu0vdev0vring0: rpu0vdev0vring0@60440000 {
+			no-map;
+			reg = <0x0 0x60440000 0x0 0x4000>; // 16KB, tx
+		};
+		rpu0vdev0vring1: rpu0vdev0vring1@60444000 {
+			no-map;
+			reg = <0x0 0x60444000 0x0 0x4000>; // 16KB, rx
+		};
+		rpu0vdev0buffer: rpu0vdev0buffer@60448000 {
+			no-map;
+			reg = <0x0 0x60448000 0x0 0x100000>; // 1MB, trace buf via debugfs
+		};
+		/* RPU1 - 2MB */
+		rproc_1_reserved: rproc@60600000 {
+			no-map;
+			reg = <0x0 0x60600000 0x0 0x40000>;
+		};
+		rpu1vdev0vring0: rpu1vdev0vring0@60640000 {
+			no-map;
+			reg = <0x0 0x60640000 0x0 0x4000>;
+		};
+		rpu1vdev0vring1: rpu1vdev0vring1@60644000 {
+			no-map;
+			reg = <0x0 0x60644000 0x0 0x4000>;
+		};
+		rpu1vdev0buffer: rpu1vdev0buffer@60648000 {
+			no-map;
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x60648000 0x0 0x100000>;
+		};
+	};
+
+	tcm_0a: tcm_0a@ffe00000 {
+		no-map;
+		reg = <0x0 0xffe00000 0x0 0x10000>;
+		status = "okay";
+		compatible = "mmio-sram";
+		power-domains = <&versal_firmware 0x1831800b>;
+	};
+
+	tcm_0b: tcm_0b@ffe20000 {
+		no-map;
+		reg = <0x0 0xffe20000 0x0 0x10000>;
+		status = "okay";
+		compatible = "mmio-sram";
+		power-domains = <&versal_firmware 0x1831800c>;
+	};
+
+	tcm_1a: tcm_1a@ffe90000 {
+		no-map;
+		reg = <0x0 0xffe90000 0x0 0x10000>;
+		status = "okay";
+		compatible = "mmio-sram";
+		power-domains = <&versal_firmware 0x1831800d>;
+	};
+
+	tcm_1b: tcm_1b@ffeb0000 {
+		no-map;
+		reg = <0x0 0xffeb0000 0x0 0x10000>;
+		status = "okay";
+		compatible = "mmio-sram";
+		power-domains = <&versal_firmware 0x1831800e>;
+	};
+
+	rf5ss@ff9a0000 {
+		compatible = "xlnx,versal-r5-remoteproc";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+		xlnx,cluster-mode = <1>; /* LOCKSTEP =0; SPLIT =1 */
+		reg = <0x0 0xff9a0000 0x0 0x10000>;
+
+		r5f_0: r5f_0 {
+			compatible = "xilinx,r5f";
+			#address-cells = <0x2>;
+			#size-cells = <0x2>;
+			ranges;
+			sram = <&tcm_0a>, <&tcm_0b>;
+			memory-region = <&rproc_0_reserved>, <&rpu0vdev0buffer>, <&rpu0vdev0vring0>, <&rpu0vdev0vring1>;
+			power-domains = <&versal_firmware 0x18110005>;
+			mboxes = <&ipi_mailbox_rpu0 0>, <&ipi_mailbox_rpu0 1>;
+			mbox-names = "tx", "rx";
+			xlnx,rsc-tbl  = <&rproc_0_reserved 0x60400000>;
+		};
+		r5f_1 {
+			compatible = "xilinx,r5f";
+			#address-cells = <0x2>;
+			#size-cells = <0x2>;
+			ranges;
+			sram = <&tcm_1a>, <&tcm_1b>;
+			memory-region = <&rproc_1_reserved>, <&rpu1vdev0buffer>, <&rpu1vdev0vring0>, <&rpu1vdev0vring1>;
+			power-domains = <&versal_firmware 0x18110006>;
+			mboxes = <&ipi_mailbox_rpu1 0>, <&ipi_mailbox_rpu1 1>;
+			mbox-names = "tx", "rx";
+			xlnx,rsc-tbl = <&rproc_1_reserved 0x60600000>;
+		};
+	};
+
+	zynqmp_ipi1 {
+		compatible = "xlnx,zynqmp-ipi-mailbox";
+		interrupt-parent = <&gic>;
+		interrupts = <0 33 4>;
+		xlnx,ipi-id = <5>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* APU<->RPU0 IPI mailbox controller */
+		ipi_mailbox_rpu0: mailbox@ff990600 {
+			reg = <0xff3f0ac0 0x20>,
+					<0xff3f0ae0 0x20>,
+					<0xff3f0740 0x20>,
+					<0xff3f0760 0x20>;
+			reg-names = "local_request_region",
+						"local_response_region",
+						"remote_request_region",
+						"remote_response_region";
+			#mbox-cells = <1>;
+			xlnx,ipi-id = <3>;
+		};
+		/* APU<->RPU1 IPI mailbox controller */
+		ipi_mailbox_rpu1: mailbox@ff990640 {
+			reg = <0xff3f0b00 0x20>,
+					<0xff3f0b20 0x20>,
+					<0xff3f0940 0x20>,
+					<0xff3f0960 0x20>;
+			reg-names = "local_request_region",
+						"local_response_region",
+						"remote_request_region",
+						"remote_response_region";
+			#mbox-cells = <1>;
+			xlnx,ipi-id = <4>;
+		};
+	};
+};
