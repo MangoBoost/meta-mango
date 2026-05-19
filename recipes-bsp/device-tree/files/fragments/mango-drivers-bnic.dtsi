@@ -1,0 +1,3 @@
+&mb_bnic0 {
+	status = "okay";
+};

@@ -1,0 +1,53 @@
+/ {
+	mb_bnic0: mb-bnic@400000000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+
+		compatible = "mangoboost,bnic";
+		status = "disabled";
+
+		reg = <0x4 0x00000000 0x0 0x10000000>, /* 256MB */
+		      <0x4 0x10000000 0x0 0x00800000>; /* 8MB */
+
+		interrupts = <0 92 1>,
+			     <0 93 1>;
+		interrupt-parent = <&gic>;
+
+		mb,hw_port = <0>;
+		mb,func_id = <0>;
+		mb,aux = "net";
+	};
+
+	mb_bnic1: mb-bnic@420000000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+
+		compatible = "mangoboost,bnic";
+		status = "disabled";
+
+		reg = <0x4 0x20000000 0x0 0x10000000>, /* 256MB */
+		      <0x4 0x30000000 0x0 0x00800000>; /* 8MB */
+
+		interrupts = <0 96 1>,
+			     <0 97 1>;
+		interrupt-parent = <&gic>;
+
+		mb,hw_port = <1>;
+		mb,func_id = <0>;
+		mb,aux = "net";
+	};
+
+	mb_mgmt0: mb-mgmt@440000000 {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+
+		compatible = "mangoboost,mgmt";
+		status = "disabled";
+
+		reg = <0x4 0x40000000 0x0 0x10000000>, /* 256MB */
+		      <0x4 0x50000000 0x0 0x00800000>; /* 8MB */
+
+		interrupts = <0 99 1>;
+		interrupt-parent = <&gic>;
+	};
+};
