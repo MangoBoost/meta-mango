@@ -1,3 +1,4 @@
+/include/ "fragments/lpddr4-base.dtsi"
 /include/ "fragments/mango-drivers-smi.dtsi"
 
 // Disable lpd peripherals controlled by r5
@@ -12,9 +13,9 @@
 };
 
 // workaround for GPIO H/W bug
-&clock_reset_pcie_mgmt_pdi_reset_axi_gpio_0 {
-	status = "disabled";
-};
+// &clock_reset_pcie_mgmt_pdi_reset_axi_gpio_0 {
+// 	status = "disabled";
+// };
 
 // not used
 &can0 {

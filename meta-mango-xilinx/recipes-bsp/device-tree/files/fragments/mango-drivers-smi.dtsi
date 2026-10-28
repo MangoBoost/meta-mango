@@ -1,0 +1,195 @@
+/include/ "fragments/rpu-resources.dtsi"
+
+/ {
+	mb_smi0: mb-smi.0 {
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+
+		compatible = "mangoboost,smi";
+		status = "okay";
+
+		remoteproc = <&r5f_0>;
+		memory-region = <&rpu_reserved2>, <&rpu_reserved1>;
+		memory-region-names = "lane", "ro";
+	};
+};
+
+&{/} {
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		/*
+		 * RPU0 shared memory (0x60400000..0x6043FFFF) split into two
+		 * no-map reservations so one SMC ELF boots on both 6.6 and
+		 * 6.12:
+		 *   rproc_0_rsc_area  holds the OpenAMP resource_table; 6.6
+		 *     locates it by scanning the SMC ELF's .resource_table
+		 *     VMA. Not listed in r5f_0.memory-region — 6.12 ioremaps
+		 *     it directly after following rsc_tbl_data.rsc_tbl.
+		 *   rproc_0_reserved  starts with SMC's .rsc_tbl_hdr ('xamp'
+		 *     magic). 6.12 reads memory-region[0].start, validates
+		 *     the magic, follows rsc_tbl back to 0x60400000.
+		 * rsc_area size must stay in lock-step with the SMC linker
+		 * gap RSC_TABLE..RSC_TBL_HDR (see lscript.ld).
+		 */
+		rproc_0_rsc_area: rsc-area@60400000 {
+			no-map;
+			reg = <0x0 0x60400000 0x0 0x400>; // 1KB, resource_table + growth headroom
+		};
+		rproc_0_reserved: rproc@60400400 {
+			no-map;
+			reg = <0x0 0x60400400 0x0 0x3FC00>; // 255KB, starts with rsc_tbl_hdr
+		};
+		/*
+		 * Node names (before '@') must be "vdev0vring%d" / "vdev0buffer"
+		 * so rproc_find_carveout_by_name() matches; otherwise the core
+		 * falls back to dma_alloc_coherent() / CMA and places vrings
+		 * outside SMC's shm_io range. Labels keep the "rpu0" prefix
+		 * for phandle stability (<&rpu0vdev0*> references).
+		 */
+		rpu0vdev0vring0: vdev0vring0@60440000 {
+			no-map;
+			reg = <0x0 0x60440000 0x0 0x4000>; // 16KB, tx
+		};
+		rpu0vdev0vring1: vdev0vring1@60444000 {
+			no-map;
+			reg = <0x0 0x60444000 0x0 0x4000>; // 16KB, rx
+		};
+		rpu0vdev0buffer: vdev0buffer@60448000 {
+			no-map;
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x60448000 0x0 0x100000>; // 1MB, vdev0 shared buffer pool
+		};
+		/* RPU1 (no SMC firmware currently runs on R5_1). */
+		rproc_1_reserved: rproc@60600000 {
+			no-map;
+			reg = <0x0 0x60600000 0x0 0x40000>;
+		};
+		rpu1vdev0vring0: vdev0vring0@60640000 {
+			no-map;
+			reg = <0x0 0x60640000 0x0 0x4000>;
+		};
+		rpu1vdev0vring1: vdev0vring1@60644000 {
+			no-map;
+			reg = <0x0 0x60644000 0x0 0x4000>;
+		};
+		rpu1vdev0buffer: vdev0buffer@60648000 {
+			no-map;
+			compatible = "shared-dma-pool";
+			reg = <0x0 0x60648000 0x0 0x100000>;
+		};
+	};
+
+	/*
+	 * TCM is now described via r5f@N reg/reg-names/power-domains per
+	 * 6.12 xlnx,versal-r5fss binding. Standalone mmio-sram nodes are
+	 * intentionally omitted to avoid devm_request_mem_region() conflicts
+	 * between the mmio-sram driver and xlnx_r5_remoteproc.
+	 */
+
+	rf5ss@ff9a0000 {
+		compatible = "xlnx,versal-r5fss";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+		/*
+		 * xlnx,cluster-mode value semantics CHANGED between 6.6 and 6.12:
+		 *   6.6 zynqmp_r5_remoteproc: raw EEMI value
+		 *       SPLIT = 1 (PM_RPU_MODE_SPLIT), LOCKSTEP = 0 (PM_RPU_MODE_LOCKSTEP)
+		 *   6.12 xlnx_r5_remoteproc: enum zynqmp_r5_cluster_mode
+		 *       SPLIT_MODE = 0, LOCKSTEP_MODE = 1, SINGLE_CPU_MODE = 2
+		 * SMC is preloaded by PLM in SPLIT mode; putting the wrong value
+		 * here causes the driver to call zynqmp_pm_set_rpu_mode(LOCKSTEP)
+		 * which halts the running R5 cores.
+		 */
+		xlnx,cluster-mode = <0>; /* 6.12: SPLIT */
+		reg = <0x0 0xff9a0000 0x0 0x10000>;
+		/*
+		 * SMC is preloaded by PLM before Linux boots. The 6.12
+		 * xlnx_r5_remoteproc attach path (see rproc_0_reserved
+		 * above) does not reset the running R5, so r5f_0 is left
+		 * probe-eligible. If that path ever regresses, set
+		 * `status = "reserved";` on each r5f node to skip probe
+		 * and keep genpd_power_off_unused() from freezing the RPU
+		 * at "Disabling unused clocks/power-domains".
+		 */
+
+		r5f_0: r5f@0 {
+			compatible = "xlnx,versal-r5f";
+			#address-cells = <0x2>;
+			#size-cells = <0x2>;
+			ranges;
+			/*
+			 * TCM banks described via reg/reg-names for
+			 * zynqmp_r5_get_tcm_node_from_dt() (xlnx_r5_remoteproc).
+			 * Sizes are 64 KB each.
+			 */
+			reg = <0x0 0xffe00000 0x0 0x10000>,
+			      <0x0 0xffe20000 0x0 0x10000>;
+			reg-names = "atcm0", "btcm0";
+			memory-region = <&rproc_0_reserved>, <&rpu0vdev0buffer>, <&rpu0vdev0vring0>, <&rpu0vdev0vring1>;
+			/*
+			 * power-domains: [0] RPU core, [1..] one per TCM bank
+			 * in same order as reg/reg-names.
+			 */
+			power-domains = <&versal_firmware 0x18110005>,
+					<&versal_firmware 0x1831800b>,
+					<&versal_firmware 0x1831800c>;
+			mboxes = <&ipi_mailbox_rpu0 0>, <&ipi_mailbox_rpu0 1>;
+			mbox-names = "tx", "rx";
+		};
+		r5f@1 {
+			compatible = "xlnx,versal-r5f";
+			#address-cells = <0x2>;
+			#size-cells = <0x2>;
+			ranges;
+			reg = <0x0 0xffe90000 0x0 0x10000>,
+			      <0x0 0xffeb0000 0x0 0x10000>;
+			reg-names = "atcm0", "btcm0";
+			memory-region = <&rproc_1_reserved>, <&rpu1vdev0buffer>, <&rpu1vdev0vring0>, <&rpu1vdev0vring1>;
+			power-domains = <&versal_firmware 0x18110006>,
+					<&versal_firmware 0x1831800d>,
+					<&versal_firmware 0x1831800e>;
+			mboxes = <&ipi_mailbox_rpu1 0>, <&ipi_mailbox_rpu1 1>;
+			mbox-names = "tx", "rx";
+		};
+	};
+
+	zynqmp_ipi1 {
+		compatible = "xlnx,zynqmp-ipi-mailbox";
+		interrupt-parent = <&gic>;
+		interrupts = <0 33 4>;
+		xlnx,ipi-id = <5>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* APU<->RPU0 IPI mailbox controller */
+		ipi_mailbox_rpu0: mailbox@ff990600 {
+			reg = <0xff3f0ac0 0x20>,
+					<0xff3f0ae0 0x20>,
+					<0xff3f0740 0x20>,
+					<0xff3f0760 0x20>;
+			reg-names = "local_request_region",
+						"local_response_region",
+						"remote_request_region",
+						"remote_response_region";
+			#mbox-cells = <1>;
+			xlnx,ipi-id = <3>;
+		};
+		/* APU<->RPU1 IPI mailbox controller */
+		ipi_mailbox_rpu1: mailbox@ff990640 {
+			reg = <0xff3f0b00 0x20>,
+					<0xff3f0b20 0x20>,
+					<0xff3f0940 0x20>,
+					<0xff3f0960 0x20>;
+			reg-names = "local_request_region",
+						"local_response_region",
+						"remote_request_region",
+						"remote_response_region";
+			#mbox-cells = <1>;
+			xlnx,ipi-id = <4>;
+		};
+	};
+};

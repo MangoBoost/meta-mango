@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: "junho.lee" <junho.lee@mangoboost.io>
+Date: Thu, 11 Jun 2026 11:49:11 +0900
+Subject: [PATCH] mtd: spi-nor: Add SECT_4K flag for mt35xu02g
+
+The mt35xu02g flash supports 4KB subsector erase in addition to the
+default 128KB sector erase. Add the SECT_4K flag so that enabling
+CONFIG_SPI_FLASH_USE_4K_SECTORS selects the 4KB erase granularity for
+this part instead of the 128KB sector erase.
+
+Signed-off-by: junho.lee <junho.lee@mangoboost.io>
+---
+ drivers/mtd/spi/spi-nor-ids.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mtd/spi/spi-nor-ids.c b/drivers/mtd/spi/spi-nor-ids.c
+index bc27ce8f864..85ffc6044db 100644
+--- a/drivers/mtd/spi/spi-nor-ids.c
++++ b/drivers/mtd/spi/spi-nor-ids.c
+@@ -374,7 +374,7 @@ const struct flash_info spi_nor_ids[] = {
+ 	{ INFO6("mt35xu01g",  0x2c5b1b, 0x104100, 128 * 1024,  1024,
+ 		USE_FSR | SPI_NOR_OCTAL_READ | SPI_NOR_4B_OPCODES | SPI_NOR_OCTAL_DTR_READ | SPI_NOR_OCTAL_DTR_PP | NO_CHIP_ERASE) },
+ 	{ INFO("mt35xu02g",  0x2c5b1c, 0, 128 * 1024,  2048,
+-		USE_FSR | SPI_NOR_OCTAL_READ | SPI_NOR_4B_OPCODES | SPI_NOR_OCTAL_DTR_READ | SPI_NOR_OCTAL_DTR_PP | NO_CHIP_ERASE) },
++		SECT_4K | USE_FSR | SPI_NOR_OCTAL_READ | SPI_NOR_4B_OPCODES | SPI_NOR_OCTAL_DTR_READ | SPI_NOR_OCTAL_DTR_PP | NO_CHIP_ERASE) },
+ #endif /* CONFIG_SPI_FLASH_MT35XU */
+ #endif
+ #ifdef CONFIG_SPI_FLASH_SPANSION	/* SPANSION */
+-- 
+2.34.1
+
