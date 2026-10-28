@@ -1,0 +1,29 @@
+// BOOT_PROVISION.BIN, UNSIGNED: the eFUSE provisioning firmware, flashed to the
+// primary slot before PPK0_HASH is burned. Template for _make_zip.sh's
+// render-BIFs step -> <package>/bifs/bootgen_provision.bif.
+
+// bootgen_secured.bif.in minus apu_subsystem (boots no Linux) plus efuse_prov_ss
+// (the eFUSE app). @PL_IMAGES@ and the plm.elf -> plm-prov.elf swap come from
+// files/_pkg_xsa_bif.py - the PL blocks differ per design, so none are written here.
+new_bif:
+{
+  id_code = @ID_CODE@
+  extended_id_code = @EXT_ID_CODE@
+  id = @BIF_ID@
+
+@PL_IMAGES@
+
+  // The app MUST have its own image block with an explicit id, or bootgen drops
+  // it silently while still exiting 0. Keep the name at 15 chars or less -
+  // bootgen truncates it to 16 bytes in the image header. See ../../README.md.
+  image
+  {
+    name = efuse_prov_ss
+    id = 0x1c000000
+    partition
+    {
+      @APP_ATTR@
+      file = mblp_prov/files/mblp-prov.elf
+    }
+  }
+}
