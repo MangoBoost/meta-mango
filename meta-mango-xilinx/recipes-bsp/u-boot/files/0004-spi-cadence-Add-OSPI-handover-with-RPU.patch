@@ -1,0 +1,114 @@
+From 2cf96ea0ba68a6e7d56b7fcefe0f14c4381a2ad8 Mon Sep 17 00:00:00 2001
+From: "hyunjun.kim" <hyunjun.kim@mangoboost.io>
+Date: Thu, 4 Jun 2026 14:17:23 +0900
+Subject: [PATCH] [PATCH] spi: cadence: Add OSPI handover with RPU
+
+Implement a register-based handshake between RPU (SMC firmware)
+and APU (U-Boot) to safely take ownership of the OSPI controller
+before initializing it.
+
+RPU firmware sets BIT(21) (OSPI_READY) at register 0x80000000
+once it has finished using OSPI. U-Boot polls this bit with a
+500ms timeout in cadence_spi_probe(). On handover success:
+  - Clears BIT(21) to consume the handshake token
+  - Resets the flash device to a known SDR state
+  - Resets the controller and re-inits the APB block
+
+On timeout, ownership is not taken (RPU absent or probe re-entry
+after handover already occurred). This prevents U-Boot from
+disturbing an OSPI session already completed by RPU.
+
+When OSPI is done, cadence_spi_remove() signals BIT(20)
+(UBOOT_DONE) at 0x80000000 so RPU can safely reinitialize OSPI.
+
+Signed-off-by: hyunjun.kim <hyunjun.kim@mangoboost.io>
+---
+ drivers/spi/cadence_qspi.c | 61 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+
+diff --git a/drivers/spi/cadence_qspi.c b/drivers/spi/cadence_qspi.c
+index f5d7cd8fa0e..7a4efd31265 100644
+--- a/drivers/spi/cadence_qspi.c
++++ b/drivers/spi/cadence_qspi.c
+@@ -16,6 +16,7 @@
+ #include <linux/err.h>
+ #include <linux/errno.h>
+ #include <linux/io.h>
++#include <linux/iopoll.h>
+ #include <linux/sizes.h>
+ #include <linux/time.h>
+ #include <zynqmp_firmware.h>
+@@ -319,6 +320,63 @@ static int cadence_spi_probe(struct udevice *bus)
+ 
+ 	priv->wr_delay = 50 * DIV_ROUND_UP(NSEC_PER_SEC, priv->ref_clk_hz);
+ 
++
++     {
++         u32 hover = 0;
++         int hret  = 0;
++
++         /* Wait for RPU OSPI handover.
++          * BIT(21) (OSPI_READY) is set by SMC firmware once it has
++          * finished using OSPI. On timeout, skip take-ownership -
++          * either the handover already happened (probe re-entry) or
++          * the RPU is absent; either way, init is not appropriate.
++          */
++         printf("U-Boot: Polling until SMC sets bit 21...\n");
++         hret = readl_poll_sleep_timeout((void __iomem *)0x80000000,
++                         hover, (hover & BIT(21)),
++                         1000, 500 * 1000);
++         if (hret) {
++             printf("U-Boot: RPU handover timeout (HOVER=0x%08x), skipping take-ownership\n",
++                    hover);
++         } else {
++             printf("U-Boot: handover successful (HOVER=0x%08x)\n",
++                    hover);
++
++             /* Consume the handshake. */
++             clrbits_le32((void __iomem *)0x80000000, BIT(21));
++
++             /* Take ownership: bring controller + flash to a known
++              * SDR state. Tied to the BIT(21) catch - runs exactly
++              * once per fresh handover, regardless of how RPU left
++              * the device.
++              */
++             ret = cadence_qspi_flash_reset(bus);
++             if (ret) {
++                 printf("U-Boot: Failed to take ownership of OSPI (flash_reset err: %d)\n",
++                        ret);
++                 return ret;
++             }
++             ret = cadence_spi_ctrl_reset(priv);
++             if (ret) {
++                 printf("U-Boot: Failed to take ownership of OSPI (ctrl_reset err: %d)\n",
++                        ret);
++                 return ret;
++             }
++             ret = wait_for_bit_le32(priv->regbase + CQSPI_REG_CONFIG,
++                         BIT(CQSPI_REG_CONFIG_IDLE_LSB),
++                         1, CQSPI_TIMEOUT_MS, 0);
++             if (ret)
++                 return ret;
++             cadence_qspi_apb_controller_init(priv);
++             priv->edge_mode = CQSPI_EDGE_MODE_SDR;
++         }
++     }
++
++	printf("U-Boot APU probe: CONFIG=0x%08x PHY=%d DTR=%d\n",
++            readl(priv->regbase + CQSPI_REG_CONFIG),
++            !!(readl(priv->regbase + CQSPI_REG_CONFIG) &                          CQSPI_REG_CONFIG_PHY_ENABLE_MASK),
++            !!(readl(priv->regbase + CQSPI_REG_CONFIG) &                          CQSPI_REG_CONFIG_DTR_PROT_EN_MASK));
++
+ 	if (device_is_compatible(bus, "amd,versal2-ospi"))
+ 		return cadence_device_reset(bus);
+ 
+@@ -331,6 +389,9 @@ static int cadence_spi_remove(struct udevice *dev)
+ 	struct cadence_spi_priv *priv = dev_get_priv(dev);
+ 	int ret = 0;
+ 
++	printf("U-Boot: OSPI usage complete, Setting UBOOT_DONE (BIT20) so RPU can reinit\n");
++	setbits_le32((void __iomem *)0x80000000, BIT(20));
++
+ 	if (priv->resets)
+ 		ret = reset_release_bulk(priv->resets);
+ 

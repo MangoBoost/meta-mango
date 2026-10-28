@@ -7,17 +7,17 @@
 		rpu_reserved0: buffer@60000000 {
 			compatible = "rpu-exclusive";
 			no-map;
-			reg = <0x0 0x60000000 0x0 0x08000000>; /* 128MB for RPU exclusive memory */
+			reg = <0x0 0x60000000 0x0 0x00800000>; /* 8MB for RPU exclusive memory */
 		};
 		rpu_reserved1: buffer@68000000 {
 			compatible = "rpu-exclusive";
 			no-map;
-			reg = <0x0 0x68000000 0x0 0x04000000>; /* 64MB for RPU-PCI shared memory */
+			reg = <0x0 0x68000000 0x0 0x00800000>; /* 8MB for RPU-PCI shared memory */
 		};
 		rpu_reserved2: buffer@6C000000 {
 			compatible = "rpu-exclusive";
 			no-map;
-			reg = <0x0 0x6C000000 0x0 0x04000000>; /* 64MB for RPU-APU shared memory */
+			reg = <0x0 0x6C000000 0x0 0x00800000>; /* 8MB for RPU-APU shared memory */
 		};
 	};
 };

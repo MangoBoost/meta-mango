@@ -10,7 +10,9 @@ SRC_URI += " \
     file://fragments/mango-drivers-mgmt.dtsi \
     file://fragments/mango-drivers-smi.dtsi \
     file://fragments/rpu-resources.dtsi \
+    file://fragments/lpddr4-base.dtsi \
     file://mango-versal-lp-generic.dtsi \
+    file://mango-versal-lp-boostx-base.dtsi \
 "
 
 # --- Machine-Specific DTSI Includes ---
@@ -18,6 +20,7 @@ SRC_URI += " \
 # This avoids variable expansion timing issues and centralizes the logic.
 # A custom variable is used here which is then read by a python function.
 DTSI_FRAGMENTS:mango-versal-lp-generic = "mango-versal-lp-generic.dtsi"
+DTSI_FRAGMENTS:mango-versal-lp-boostx-base = "mango-versal-lp-boostx-base.dtsi"
 
 # This python function reads our custom DTSI_FRAGMENTS variable
 # and appends the necessary include directives to the common system-user.dtsi file.

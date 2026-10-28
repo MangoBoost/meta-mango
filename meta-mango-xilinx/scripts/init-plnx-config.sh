@@ -6,8 +6,8 @@ set -euo pipefail
 
 # Find the root directory of meta-mango
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-ROOT_DIR=$(dirname "$SCRIPT_DIR")
-MACHINE_DIR="$ROOT_DIR/conf/machine"
+ROOT_DIR=$(dirname "$(dirname "$SCRIPT_DIR")")
+MACHINE_DIR="$ROOT_DIR/meta-mango-xilinx/conf/machine"
 
 validate_machine_name() {
     local name="$1"
@@ -148,10 +148,31 @@ main() {
     config["CONFIG_SUBSYSTEM_UBOOT_QSPI_BOOTSCR_OFFSET"]='"0x20000"'
     config["CONFIG_SUBSYSTEM_UBOOT_QSPI_BOOTSCR_SIZE"]='"0x20000"'
     config["CONFIG_YOCTO_MACHINE_NAME"]="\"$machine_name\""
-    config["CONFIG_USER_LAYER_0"]=\"$ROOT_DIR\"
-    config["CONFIG_USER_LAYER_1"]='""'
-    config["CONFIG_SUBSYSTEM_HOSTNAME"]='"mango-versal"'
+    config["CONFIG_USER_LAYER_0"]=\"$ROOT_DIR/meta-mango-core\"
+    config["CONFIG_USER_LAYER_1"]=\"$ROOT_DIR/meta-mango-xilinx\"
+    config["CONFIG_USER_LAYER_2"]='""'
+    local _mn_parts
+    IFS='-' read -ra _mn_parts <<< "$machine_name"
+    if [[ "$machine_name" == *-boostx-* ]]; then
+        config["CONFIG_SUBSYSTEM_HOSTNAME"]="\"${_mn_parts[0]}-${_mn_parts[2]}-${_mn_parts[3]}-${_mn_parts[-1]}\""
+    else
+        config["CONFIG_SUBSYSTEM_HOSTNAME"]="\"${_mn_parts[0]}-${_mn_parts[2]}-${_mn_parts[-1]}\""
+    fi
     config["CONFIG_SUBSYSTEM_PRODUCT"]='"mango-versal-lp"'
+
+    local kconfig_syshw
+    kconfig_syshw="$(dirname "$config_file")/configs/Kconfig.syshw"
+
+    if [[ ! -f "$kconfig_syshw" ]]; then
+        echo "Warning: '$kconfig_syshw' not found; skipping Vivado 2025 memory workaround." >&2
+    elif ! grep -qE '0x20108000000|0x448000000' "$kconfig_syshw"; then
+        echo "Note: '$kconfig_syshw' shows no Vivado 2025 bug signature; skipping memory workaround." >&2
+    else
+        config["CONFIG_SUBSYSTEM_MEMORY_AXI_NOC_MC_LPDDR4_0_DDR_LOW0_BASEADDR"]="0x0"
+        config["CONFIG_SUBSYSTEM_MEMORY_AXI_NOC_MC_LPDDR4_0_DDR_LOW0_SIZE"]="0x80000000"
+        config["CONFIG_SUBSYSTEM_MEMORY_AXI_NOC_MC_LPDDR4_0_DDR_LOW0_U__BOOT_TEXTBASE_OFFSET"]="0x8000000"
+        "$SCRIPT_DIR/init-plnx-config-syshw.helper.sh" "$kconfig_syshw"
+    fi
 
     # --- 5. Create a temporary file ---
     tmp_output_file=$(mktemp)
@@ -169,6 +190,7 @@ main() {
 
     sed_expressions+=(-e 's/^CONFIG_SUBSYSTEM_COPY_TO_TFTPBOOT=y/# CONFIG_SUBSYSTEM_COPY_TO_TFTPBOOT is not set/')
     sed_expressions+=(-e '/^CONFIG_SUBSYSTEM_TFTPBOOT_DIR=.*/d')
+    sed_expressions+=(-e 's/^# CONFIG_SUBSYSTEM_UBOOT_EXT_DTB is not set/CONFIG_SUBSYSTEM_UBOOT_EXT_DTB=y\nCONFIG_UBOOT_DTB_PACKAGE_NAME="u-boot.dtb"/')
 
     # Logic for adding the partition block
     # Create a single multi-line string for sed's 'a' (append) command.
@@ -197,7 +219,11 @@ CONFIG_SUBSYSTEM_FLASH_IP_NAME=${config[CONFIG_SUBSYSTEM_FLASH_IP_NAME]}"
     fi
 
     if ! grep -q "^CONFIG_USER_LAYER_1=" "$config_file"; then
-        sed_expressions+=(-e "/^CONFIG_USER_LAYER_0=.*/a CONFIG_USER_LAYER_1=${config[CONFIG_USER_LAYER_1]}")
+        sed_expressions+=(-e "/^CONFIG_USER_LAYER_0=.*/a \\
+CONFIG_USER_LAYER_1=${config[CONFIG_USER_LAYER_1]}\\
+CONFIG_USER_LAYER_2=${config[CONFIG_USER_LAYER_2]}")
+    elif ! grep -q "^CONFIG_USER_LAYER_2=" "$config_file"; then
+        sed_expressions+=(-e "/^CONFIG_USER_LAYER_1=.*/a CONFIG_USER_LAYER_2=${config[CONFIG_USER_LAYER_2]}")
     fi
 
     if [[ "$enable_emmc" == true ]]; then
