@@ -1,0 +1,20 @@
+// AUTH_JTAG message - re-enable JTAG on a secured device. NOT a boot image, and
+// it must stay a separate file. Built by _sign_secure_boot.sh's AUTH_JTAG step from
+// scripts/secure_boot/files/; see ../../README.md for xsdb usage and custody.
+
+auth_jtag:
+{
+  // signed with the PSK only - no sskfile here
+  pskfile = keys/RSA/psk1_rsa.pem
+
+  authjtag_config
+  {
+    // Placeholder: _sign_secure_boot.sh renders SB_AUTHJTAG_REVOKE_ID over it.
+    // Signed over, and the PLM refuses the message if the card has revoked the ID.
+    revoke_id = 0x00
+
+    // Optional. JTAG stays enabled for this long before the device
+    // re-locks. Omit to take the device default.
+    // jtag_timeout = 0x100
+  }
+}

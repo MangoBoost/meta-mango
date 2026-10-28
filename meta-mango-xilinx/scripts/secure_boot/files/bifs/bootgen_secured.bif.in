@@ -1,0 +1,85 @@
+// Production secure image (authenticated + encrypted), package edition.
+// Template for _make_zip.sh's render-BIFs step; @PL_IMAGES@ is filled from the
+// BIF inside the board XSA. Result: <package>/bifs/bootgen_secured.bif.
+
+// Paths resolve against bootgen's CWD - the PACKAGE ROOT, where the Key Manager
+// runs it. keys/ is NOT in the zip: they symlink their own tree into the package
+// root after unpacking, which is why these key paths never change. See ../../README.md.
+
+// The PL/PMC/PSM image blocks differ per design and are generated from the XSA's
+// own BIF (files/_pkg_xsa_bif.py); what stays here is what PetaLinux owns:
+// the header, the metaheader, and apu_subsystem.
+new_bif:
+{
+  id_code = @ID_CODE@
+  extended_id_code = @EXT_ID_CODE@
+  id = @BIF_ID@
+
+  // PSK signs the SPK (its hash goes into the PPK eFUSEs), SSK signs each
+  // partition. Declared once at BIF level so every partition below shares
+  // the same key pair - do not repeat them per partition.
+  pskfile = keys/RSA/psk1_rsa.pem
+  sskfile = keys/RSA/ssk1_rsa.pem
+
+  metaheader
+  {
+    revoke_id = 0x0
+    authentication = rsa
+    encryption = aes
+    blocks = 1728(*)
+    keysrc = efuse_red_key
+    aeskeyfile = keys/AES/mango_metaheader.nky
+  }
+
+@PL_IMAGES@
+
+  image
+  {
+    name = apu_subsystem
+    id = 0x1c000000
+    partition
+    {
+      type = raw
+      load = 0x1000
+      file = mblp/files/u-boot.dtb
+      authentication = rsa
+      encryption = aes
+      blocks = 1728(*)
+      keysrc = efuse_red_key
+      aeskeyfile = keys/AES/mango_system.nky
+    }
+    partition
+    {
+      core = a72-0
+      exception_level = el-3
+      trustzone
+      file = mblp/files/bl31.elf
+      authentication = rsa
+      encryption = aes
+      blocks = 1728(*)
+      keysrc = efuse_red_key
+      aeskeyfile = keys/AES/mango_bl31.nky
+    }
+    partition
+    {
+      core = a72-0
+      exception_level = el-2
+      file = mblp/files/u-boot.elf
+      authentication = rsa
+      encryption = aes
+      blocks = 1728(*)
+      keysrc = efuse_red_key
+      aeskeyfile = keys/AES/mango_uboot.nky
+    }
+    partition
+    {
+      core = r5-0
+      file = mblp/files/mblp.elf
+      authentication = rsa
+      encryption = aes
+      blocks = 1728(*)
+      keysrc = efuse_red_key
+      aeskeyfile = keys/AES/mango_inband_smc.nky
+    }
+  }
+}

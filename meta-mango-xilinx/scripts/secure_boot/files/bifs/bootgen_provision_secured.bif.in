@@ -1,0 +1,63 @@
+// The PROVISION image, SIGNED. Needed once PPK0_HASH is burned: the ROM then
+// rejects an unsigned image (0x345) and all further eFUSE work - read-back
+// included - has to be signed. Ships alongside the unsigned one.
+
+// Authenticated AND encrypted, every block of it - keysrc = efuse_red_key below.
+// Encryption here is defence in depth, not a ROM requirement: DEC_ONLY is NEVER armed
+// in this flow, because S-HWRoT decrypts only with a PUF KEK and every keysrc here is
+// the red key (LP R.2 was lost to that burn on 2026-08-05 - see ../../README.md).
+//
+// What it does require is the red key in the AES row: a part whose AES_KEY is not
+// burned cannot open this image. _gen_keys.sh leaves AES_KEY out of the default arm
+// list, so that burn is a separate, deliberate step. _sign_secure_boot.sh's verify
+// step re-checks both - every block encrypted, and whether the key is being written.
+// Building it needs the .nky files, not the RSA keys alone.
+//
+// The unsigned bootgen_provision.bif is plaintext and stays that way: it is the image
+// that performs the burn, so it runs before PPK0_HASH is sealed - and it could not be
+// encrypted anyway on a part whose AES row is still empty.
+
+// Template for _make_zip.sh's render-BIFs step -> bifs/bootgen_provision_secured.bif.
+// Same partitions as bootgen_provision.bif.in - only the authentication lines and
+// the BIF-level key pair differ. PL blocks come from files/_pkg_xsa_bif.py.
+new_bif:
+{
+  id_code = @ID_CODE@
+  extended_id_code = @EXT_ID_CODE@
+  id = @BIF_ID@
+
+  // the same key pair as the golden image - it is the PPK0 hash already in the
+  // eFUSEs that this has to satisfy
+  pskfile = keys/RSA/psk1_rsa.pem
+  sskfile = keys/RSA/ssk1_rsa.pem
+
+  metaheader
+  {
+    authentication = rsa
+    encryption = aes
+    blocks = 1728(*)
+    keysrc = efuse_red_key
+    aeskeyfile = keys/AES/mango_metaheader.nky
+  }
+
+@PL_IMAGES@
+
+  // The app MUST have its own image block with an explicit id, or bootgen drops
+  // it silently while still exiting 0. Keep the name at 15 chars or less -
+  // bootgen truncates it to 16 bytes in the image header. See ../../README.md.
+  image
+  {
+    name = efuse_prov_ss
+    id = 0x1c000000
+    partition
+    {
+      @APP_ATTR@
+      file = mblp_prov/files/mblp-prov.elf
+      authentication = rsa
+      encryption = aes
+      blocks = 1728(*)
+      keysrc = efuse_red_key
+      aeskeyfile = keys/AES/mango_inband_smc_prov.nky
+    }
+  }
+}

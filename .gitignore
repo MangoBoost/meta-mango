@@ -1,0 +1,40 @@
+*.swp
+*.swo
+**/__pycache__/
+
+# Secure boot key material and build artifacts - must never be committed. The
+# flow writes under scripts/secure_boot/files/, except the AUTH_JTAG message
+# (one level up). All key material lives under files/keys/ - one rule covers it.
+meta-mango-xilinx/scripts/secure_boot/files/keys/
+# _gen_keys.sh's default tree. Losing psk1_rsa.pem bricks every board burned with
+# its PPK0 hash, and this sits in the working tree - back it up off this checkout.
+meta-mango-xilinx/scripts/secure_boot/files/secure_boot_keys/
+# any other key tree kept beside it (per-board copies, rekey test trees)
+meta-mango-xilinx/scripts/secure_boot/files/secure_boot_keys*/
+# key_manager.sh's lock file
+meta-mango-xilinx/scripts/secure_boot/files/.key_manager.lock
+# key_manager.sh workspaces: files/workspaces/<project>/<state>/ holds the key set, the Developer's
+# package, the flash tars and the work trees. Never in the repo; back keys/ up off it.
+meta-mango-xilinx/scripts/secure_boot/files/workspaces/
+# a flash tar dropped at the repo root (bare-tree runs write it to the cwd): its
+# provision_BOOT.BIN can carry a red key in the clear
+/flash-*.tar
+# bootgen writes the pmcdata key into its CWD (files/) regardless of the BIF
+# path - the one key file that cannot be kept under keys/
+meta-mango-xilinx/scripts/secure_boot/files/*.nky
+meta-mango-xilinx/scripts/secure_boot/files/xsa_files/
+meta-mango-xilinx/scripts/secure_boot/files/bootgen_log.txt
+# make_zip.sh staging tree: a full copy of the boot materials, rebuilt from
+# scratch on every run. The zip itself lands in the project root, outside this
+# repo, so it needs no rule here.
+meta-mango-xilinx/scripts/secure_boot/files/_pkg/
+# per-run step logs from files/_sign_secure_boot.sh; they quote key material
+meta-mango-xilinx/scripts/secure_boot/files/logs/
+# authenticatedJtagImage-rsa.bin: signed with the primary key, unlocks JTAG on a
+# provisioned board. Belongs to the key owner, never in the repo.
+meta-mango-xilinx/scripts/secure_boot/*.bin
+meta-mango-xilinx/scripts/secure_boot/files/*.bin
+
+# wrap-package.sh output: the tgz handed to the Key Manager, plus the staged tree
+# it was built from. Build artifacts, remade on every run.
+deliverable/
