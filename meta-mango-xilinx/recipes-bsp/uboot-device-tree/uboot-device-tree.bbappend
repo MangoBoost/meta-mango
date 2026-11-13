@@ -7,9 +7,10 @@ SRC_URI += " file://fragments/versal-common.dtsi \
              file://fragments/lpddr4-base.dtsi \
              file://fragments/mango-drivers-smi.dtsi \
              file://fragments/rpu-resources.dtsi \
-             file://fragments/ospi-flash.dtsi"
+             file://fragments/ospi-flash.dtsi \
+             file://fragments/uboot-i2c-enable.dtsi"
 
-UBOOT_DT_FRAGMENTS = "fragments/versal-common.dtsi fragments/ospi-flash.dtsi"
+UBOOT_DT_FRAGMENTS = "fragments/versal-common.dtsi fragments/ospi-flash.dtsi fragments/uboot-i2c-enable.dtsi"
 
 python do_patch:append() {
     import os

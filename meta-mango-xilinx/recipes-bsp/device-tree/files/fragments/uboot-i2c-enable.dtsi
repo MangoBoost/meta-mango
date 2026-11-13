@@ -1,0 +1,11 @@
+// U-Boot-only override: U-Boot drives the PS I2C controllers.
+// Linux keeps them disabled (versal-common.dtsi).
+&i2c0 {
+	status = "okay";
+};
+&i2c1 {
+	status = "okay";
+};
+&i2c2 {
+	status = "okay";
+};
