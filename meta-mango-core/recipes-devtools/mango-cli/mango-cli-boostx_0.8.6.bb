@@ -6,7 +6,7 @@ LIC_FILES_CHKSUM = "file://usr/share/licenses/mango-cli-boostx/LICENSE;md5=23929
 NO_GENERIC_LICENSE[LicenseRef-MangoBoost-Proprietary-1.0] = "usr/share/licenses/mango-cli-boostx/LICENSE"
 
 MANGO_CLI_URI ?= "https://repo.mangoboost.io/artifactory/public-generic/petalinux-2025.2/mango-cli-boostx-${PV}-0.petalinux-2025.2-aarch64.tar.gz"
-MANGO_CLI_SHA256 ?= "42dfa7c5b1c3b4a5dd13ba6980053afb4130c1e60e0b49865ca88ae6d342e902"
+MANGO_CLI_SHA256 ?= "339cef79aa2d2c598d45aee21ff28857036eddc69972d336535f4d3802dd954f"
 
 SRC_URI = "${MANGO_CLI_URI};subdir=${BP}"
 SRC_URI[sha256sum] = "${MANGO_CLI_SHA256}"
