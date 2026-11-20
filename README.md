@@ -11,7 +11,14 @@ The repository root is not a layer itself; it holds these sub-layers:
 ## Prerequisites
 
 - AMD PetaLinux Tools v2025.2: [link](https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/embedded-design-tools/2025-2.html).
-  Source its `settings.sh` so `petalinux-*` and `bootgen` are in `PATH`.
+  Source its `settings.sh` in every shell that runs a build, so
+  `petalinux-*`, `bootgen` and the PetaLinux `python3` are in `PATH`:
+  ```
+  source <petalinux-install-dir>/settings.sh
+  ```
+  The build scripts call `python3` from `PATH`. PetaLinux 2025.2 brings
+  Python 3.12; without `settings.sh` they pick up the system `python3`,
+  and an old one (3.6, for example) fails when the boot image is packaged.
 - Hardware design file (`.xsa`) exported from AMD Vivado.
 - The MangoBoost software package (`mango-bsp`), which installs the SMC
   firmware under `/etc/mango/firmware/`. `BOOT.BIN` carries that firmware.
